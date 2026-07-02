@@ -16,7 +16,9 @@
 
 这是 零音LyCecilion 在 XDOJ 上的题解，在 GitHub 上开源，主要是留作自己刷题的记录，同时也供其他同学们参考。在该 Repo 中，零音尽可能将代码写得足够规范、完善、简洁、优雅和鲁棒，每个解答均通过了 XDOJ 的在线评测，且经过 AI 的审核，因此多数情况下，零音可确保这里的题解是万无一失的。
 
-题目正在逐步整理上传中，欢迎持续关注。如果有更好的写法或者想补充新题目的题解，欢迎发送 Pull Request。
+目前该 Repo 共含有 <!--problem-count-->17<!--problem-count--> 道题目的题解，包括但不限于字符串处理、表达式求值、排序统计，难度由一星到五星。每题一个目录，目录中含有题解源码、题目描述、样例数据和思路记录。
+
+如果有更好的写法或者想补充新题目的题解，欢迎发送 Pull Request。项目编码规范见 [CONVENTIONS.md](./CONVENTIONS.md)。
 
 ## 题目列表
 
@@ -82,6 +84,7 @@ problems/<id>/
   problem.toml            # 元数据：语言、时限、内存限制、难度等
   main.c | main.cpp       # 题解源码
   README.md               # 题目描述
+  NOTES.md                # 解题思路（可选）
   samples/
     1.in / 1.out
 ```
@@ -100,13 +103,14 @@ just bench 473            # 性能测量（release 模式）
 just memcheck 473         # Valgrind 内存检查
 just fmt                  # 格式化所有代码
 just tidy 473             # clang-tidy 静态分析
-just sync-list            # 更新 README 题目列表
+just commit 473           # 提交题目（自动检测新增/修改）
+just sync-list            # 更新 README 题目列表和计数
 just clean                # 清理构建产物
 ```
 
 构建模式：
 
-- `debug`：默认模式，开启 address,undefined sanitizer 和较强警告，适合样例测试。
+- `debug`：默认模式，开启 address, undefined sanitizer 和较强警告，适合样例测试。
 - `release`：`-O2`，接近 OJ 提交环境，供运行时间和内存测量使用。
 - `memcheck`：带调试信息但不启用 sanitizer，供 Valgrind 使用。
 
