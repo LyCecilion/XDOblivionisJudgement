@@ -1,0 +1,7 @@
+id = 72
+language = "cpp"
+source = "main.cpp"
+time_limit_ms = 1000
+memory_limit_mb = 1
+title = "寻找最长的行"
+difficulty = 2
