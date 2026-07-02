@@ -1,0 +1,32 @@
+CompileFlags:
+  Add:
+    - -Wall
+    - -Wextra
+    - -Wshadow
+    - -Wconversion
+    - -Wno-sign-conversion
+    - -Wpedantic
+    - -Wformat=2
+    - -Wnull-dereference
+    - -Wdouble-promotion
+    - -Wimplicit-fallthrough
+    - -Wvla
+    - -DLOCAL
+
+---
+
+If:
+  PathMatch: .*\.c
+CompileFlags:
+  Add:
+    - -std=gnu17
+
+---
+
+If:
+  PathMatch: .*\.cpp
+CompileFlags:
+  Add:
+    - -std=gnu++17
+    - -D_GLIBCXX_DEBUG
+    - -D_GLIBCXX_DEBUG_PEDANTIC

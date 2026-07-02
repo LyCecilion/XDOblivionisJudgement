@@ -1,0 +1,674 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+defaults_file="$repo_root/oj.defaults.toml"
+build_root="$repo_root/.build"
+
+fallback_time_limit_ms=1000
+fallback_memory_limit_mb=128
+fallback_language="cpp"
+fallback_compare="trim-trailing"
+
+usage() {
+    cat <<'EOF'
+usage: tools/oj <command> [args]
+
+commands:
+  list
+  add [-c] <problem-id>
+  build <problem-id> [debug|release|memcheck]
+  run <problem-id> [debug|release]
+  test <problem-id> [debug|release]
+  check <problem-id>
+  fmt [problem-id|path]
+  tidy <problem-id|path>
+  bench <problem-id>
+  memcheck <problem-id>
+  sync-list
+  clean [problem-id]
+EOF
+}
+
+die() {
+    echo "[oj] error: $*" >&2
+    exit 1
+}
+
+require_cmd() {
+    command -v "$1" >/dev/null 2>&1 || die "missing command: $1"
+}
+
+require_linux() {
+    [[ "$(uname -s)" == "Linux" ]] || die "$1 is only available on Linux"
+}
+
+toml_get() {
+    local file="$1"
+    local key="$2"
+
+    [[ -f "$file" ]] || return 1
+
+    awk -F= -v key="$key" '
+        function trim(s) {
+            gsub(/^[ \t]+|[ \t]+$/, "", s)
+            return s
+        }
+
+        /^[ \t]*#/ || /^[ \t]*$/ { next }
+
+        {
+            k = trim($1)
+            if (k != key) {
+                next
+            }
+
+            v = substr($0, index($0, "=") + 1)
+            sub(/[ \t]*#.*/, "", v)
+            v = trim(v)
+            if (v ~ /^".*"$/) {
+                v = substr(v, 2, length(v) - 2)
+            }
+            print v
+            found = 1
+            exit
+        }
+
+        END {
+            if (!found) {
+                exit 1
+            }
+        }
+    ' "$file"
+}
+
+default_value() {
+    local key="$1"
+    local fallback="$2"
+
+    toml_get "$defaults_file" "$key" || printf '%s\n' "$fallback"
+}
+
+problem_dir() {
+    local id="$1"
+    local dir="$repo_root/problems/$id"
+    [[ -d "$dir" ]] || die "problem not found: $id"
+    printf '%s\n' "$dir"
+}
+
+problem_file() {
+    local id="$1"
+    local dir
+    dir="$(problem_dir "$id")"
+    printf '%s\n' "$dir/problem.toml"
+}
+
+problem_value() {
+    local id="$1"
+    local key="$2"
+    local fallback="$3"
+    local meta
+    meta="$(problem_file "$id")"
+
+    toml_get "$meta" "$key" || default_value "$key" "$fallback"
+}
+
+compare_mode() {
+    local id="$1"
+    problem_value "$id" compare "$fallback_compare"
+}
+
+problem_source() {
+    local id="$1"
+    local dir
+    local meta
+    local source
+    local language
+
+    dir="$(problem_dir "$id")"
+    meta="$(problem_file "$id")"
+    source="$(toml_get "$meta" source || true)"
+
+    if [[ -z "$source" ]]; then
+        language="$(problem_value "$id" language "$fallback_language")"
+        case "$language" in
+            c) source="main.c" ;;
+            cpp | c++) source="main.cpp" ;;
+            *) die "unsupported language for $id: $language" ;;
+        esac
+    fi
+
+    [[ -f "$dir/$source" ]] || die "source not found: problems/$id/$source"
+    printf '%s\n' "$dir/$source"
+}
+
+problem_language() {
+    local id="$1"
+    local source
+    source="$(problem_source "$id")"
+
+    case "$source" in
+        *.c) printf 'c\n' ;;
+        *.cc | *.cpp | *.cxx) printf 'cpp\n' ;;
+        *) problem_value "$id" language "$fallback_language" ;;
+    esac
+}
+
+build_dir() {
+    local id="$1"
+    local mode="$2"
+    printf '%s\n' "$build_root/$id/$mode"
+}
+
+binary_path() {
+    local id="$1"
+    local mode="$2"
+    printf '%s\n' "$(build_dir "$id" "$mode")/main"
+}
+
+compiler_for() {
+    local language="$1"
+
+    case "$language" in
+        c) printf '%s\n' "${CC:-gcc}" ;;
+        cpp) printf '%s\n' "${CXX:-g++}" ;;
+        *) die "unsupported language: $language" ;;
+    esac
+}
+
+std_for() {
+    local language="$1"
+
+    case "$language" in
+        c) printf '%s\n' "${OJ_CSTD:-gnu17}" ;;
+        cpp) printf '%s\n' "${OJ_STD:-gnu++17}" ;;
+        *) die "unsupported language: $language" ;;
+    esac
+}
+
+compile_args() {
+    local language="$1"
+    local mode="$2"
+    local std
+    std="$(std_for "$language")"
+
+    printf '%s\0' "-std=$std"
+    printf '%s\0' \
+        -Wall \
+        -Wextra \
+        -Wshadow \
+        -Wconversion \
+        -Wno-sign-conversion \
+        -Wpedantic \
+        -Wformat=2 \
+        -Wnull-dereference \
+        -Wdouble-promotion \
+        -Wimplicit-fallthrough \
+        -Wvla
+
+    case "$mode" in
+        debug)
+            printf '%s\0' -DLOCAL -O1 -g3 -fsanitize=address,undefined -fno-omit-frame-pointer
+            if [[ "$language" == "cpp" ]]; then
+                printf '%s\0' -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC
+            fi
+            ;;
+        release)
+            printf '%s\0' -DNDEBUG -O2 -pipe
+            ;;
+        memcheck)
+            printf '%s\0' -DLOCAL -O1 -g3 -fno-omit-frame-pointer
+            if [[ "$language" == "cpp" ]]; then
+                printf '%s\0' -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC
+            fi
+            ;;
+        *)
+            die "unknown build mode: $mode"
+            ;;
+    esac
+}
+
+build_problem() {
+    local id="$1"
+    local mode="${2:-debug}"
+    local source
+    local language
+    local compiler
+    local out
+    local out_dir
+    local args=()
+
+    source="$(problem_source "$id")"
+    language="$(problem_language "$id")"
+    compiler="$(compiler_for "$language")"
+    out="$(binary_path "$id" "$mode")"
+    out_dir="$(dirname "$out")"
+
+    require_cmd "$compiler"
+    mkdir -p "$out_dir"
+
+    while IFS= read -r -d '' arg; do
+        args+=("$arg")
+    done < <(compile_args "$language" "$mode")
+
+    echo "[oj-build] $compiler $mode problems/$id/$(basename "$source") -> ${out#$repo_root/}"
+    "$compiler" "${args[@]}" "$source" -o "$out"
+}
+
+sample_inputs() {
+    local id="$1"
+    local dir
+    dir="$(problem_dir "$id")"
+    find "$dir/samples" -maxdepth 1 -type f -name '*.in' | sort
+}
+
+compare_output() {
+    local id="$1"
+    local expected="$2"
+    local actual="$3"
+    local compare
+
+    compare="$(compare_mode "$id")"
+
+    case "$compare" in
+        exact)
+            diff -u "$expected" "$actual"
+            ;;
+        trim-trailing)
+            diff -u -Z --strip-trailing-cr "$expected" "$actual"
+            ;;
+        *)
+            die "unsupported compare mode for problem $id: $compare"
+            ;;
+    esac
+}
+
+run_case() {
+    local id="$1"
+    local bin="$2"
+    local input="$3"
+    local expected="$4"
+    local actual="$5"
+
+    mkdir -p "$(dirname "$actual")"
+    ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" \
+        UBSAN_OPTIONS="${UBSAN_OPTIONS:-print_stacktrace=1}" \
+        "$bin" < "$input" > "$actual"
+
+    if [[ -f "$expected" ]]; then
+        compare_output "$id" "$expected" "$actual"
+    fi
+}
+
+test_problem() {
+    local id="$1"
+    local mode="${2:-debug}"
+    local bin
+    local input
+    local expected
+    local actual
+    local count=0
+
+    require_cmd diff
+    build_problem "$id" "$mode"
+    bin="$(binary_path "$id" "$mode")"
+
+    while IFS= read -r input; do
+        count=$((count + 1))
+        expected="${input%.in}.out"
+        actual="$build_root/$id/samples/$(basename "${input%.in}").actual"
+
+        [[ -f "$expected" ]] || die "missing expected output: ${expected#$repo_root/}"
+        echo "[oj-test] ${input#$repo_root/}"
+        run_case "$id" "$bin" "$input" "$expected" "$actual"
+        echo "[oj-test] accepted: ${input#$repo_root/}"
+    done < <(sample_inputs "$id")
+
+    (( count > 0 )) || die "no samples/*.in found for problem $id"
+}
+
+bench_case() {
+    local id="$1"
+    local bin="$2"
+    local input="$3"
+    local expected="$4"
+    local label="$5"
+    local time_limit_ms="$6"
+    local memory_limit_mb="$7"
+    local timeout_seconds
+    local memory_limit_kb
+    local actual
+    local report
+    local rss
+
+    timeout_seconds=$(((time_limit_ms + 999) / 1000 + 1))
+    memory_limit_kb=$((memory_limit_mb * 1024))
+    actual="$build_root/$id/bench/$label.actual"
+    report="$build_root/$id/bench/$label.time"
+
+    mkdir -p "$(dirname "$actual")"
+
+    echo "[oj-bench] $label timeout=${timeout_seconds}s memory=${memory_limit_mb}MiB"
+    /usr/bin/time -v -o "$report" \
+        timeout "$timeout_seconds" \
+        bash -c 'ulimit -v "$1"; exec "$2" < "$3" > "$4"' \
+        bash "$memory_limit_kb" "$bin" "$input" "$actual"
+
+    if [[ -f "$expected" ]]; then
+        compare_output "$id" "$expected" "$actual"
+    fi
+
+    rss="$(awk -F: '/Maximum resident set size/ { gsub(/^[ \t]+/, "", $2); print $2 " KB" }' "$report")"
+    echo "[oj-bench] max-rss=${rss:-unknown} report=${report#$repo_root/}"
+}
+
+bench_problem() {
+    local id="$1"
+    local bin
+    local input
+    local expected
+    local label
+    local count=0
+    local time_limit_ms
+    local memory_limit_mb
+
+    require_linux "bench"
+    require_cmd timeout
+    [[ -x /usr/bin/time ]] || die "missing /usr/bin/time"
+
+    time_limit_ms="$(problem_value "$id" time_limit_ms "$fallback_time_limit_ms")"
+    memory_limit_mb="$(problem_value "$id" memory_limit_mb "$fallback_memory_limit_mb")"
+
+    build_problem "$id" release
+    bin="$(binary_path "$id" release)"
+
+    while IFS= read -r input; do
+        count=$((count + 1))
+        expected="${input%.in}.out"
+        label="sample-$(basename "${input%.in}")"
+        [[ -f "$expected" ]] || die "missing expected output: ${expected#$repo_root/}"
+        bench_case "$id" "$bin" "$input" "$expected" "$label" "$time_limit_ms" "$memory_limit_mb"
+    done < <(sample_inputs "$id")
+
+    if [[ -d "$(problem_dir "$id")/stress" ]]; then
+        while IFS= read -r input; do
+            count=$((count + 1))
+            expected="${input%.in}.out"
+            label="stress-$(basename "${input%.in}")"
+            bench_case "$id" "$bin" "$input" "$expected" "$label" "$time_limit_ms" "$memory_limit_mb"
+        done < <(find "$(problem_dir "$id")/stress" -maxdepth 1 -type f -name '*.in' | sort)
+    fi
+
+    (( count > 0 )) || die "no samples/*.in or stress/*.in found for problem $id"
+}
+
+memcheck_problem() {
+    local id="$1"
+    local bin
+    local input
+    local expected
+    local actual
+    local count=0
+
+    require_linux "memcheck"
+    require_cmd valgrind
+    require_cmd diff
+
+    build_problem "$id" memcheck
+    bin="$(binary_path "$id" memcheck)"
+
+    while IFS= read -r input; do
+        count=$((count + 1))
+        expected="${input%.in}.out"
+        actual="$build_root/$id/memcheck/$(basename "${input%.in}").actual"
+        [[ -f "$expected" ]] || die "missing expected output: ${expected#$repo_root/}"
+        mkdir -p "$(dirname "$actual")"
+
+        echo "[oj-memcheck] ${input#$repo_root/}"
+        valgrind --leak-check=full --track-origins=yes --error-exitcode=99 \
+            "$bin" < "$input" > "$actual"
+        compare_output "$id" "$expected" "$actual"
+    done < <(sample_inputs "$id")
+
+    (( count > 0 )) || die "no samples/*.in found for problem $id"
+}
+
+fmt_target() {
+    local target="${1:-}"
+    local source
+
+    require_cmd clang-format
+
+    if [[ -z "$target" ]]; then
+        find "$repo_root/problems" -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' \) -print0 |
+            xargs -0 -r clang-format -i
+        clang-format -i "$repo_root/template.c" "$repo_root/template.cpp"
+    elif [[ -e "$target" ]]; then
+        clang-format -i "$target"
+    else
+        source="$(problem_source "$target")"
+        clang-format -i "$source"
+    fi
+}
+
+tidy_target() {
+    local target="$1"
+    local source
+    local language
+    local args=()
+
+    require_cmd clang-tidy
+
+    if [[ -e "$target" ]]; then
+        source="$target"
+        case "$source" in
+            *.c) language="c" ;;
+            *) language="cpp" ;;
+        esac
+    else
+        source="$(problem_source "$target")"
+        language="$(problem_language "$target")"
+    fi
+
+    while IFS= read -r -d '' arg; do
+        args+=("$arg")
+    done < <(compile_args "$language" debug)
+
+    clang-tidy --quiet "$source" -- "${args[@]}" \
+        2> >(grep -v -E '^[0-9]+ warnings generated\.$' >&2)
+}
+
+add_problem() {
+    local c_mode=false
+    local id
+    local dir
+    local language
+    local source
+
+    if [[ "${1:-}" == "-c" ]]; then
+        c_mode=true
+        shift
+    fi
+
+    id="${1:-}"
+    [[ -n "$id" ]] || die "usage: tools/oj add [-c] <problem-id>"
+
+    dir="$repo_root/problems/$id"
+    [[ ! -e "$dir" ]] || die "already exists: problems/$id"
+
+    mkdir -p "$dir/samples"
+
+    if $c_mode; then
+        language="c"
+        source="main.c"
+        cp "$repo_root/template.c" "$dir/$source"
+    else
+        language="cpp"
+        source="main.cpp"
+        cp "$repo_root/template.cpp" "$dir/$source"
+    fi
+
+    cat > "$dir/problem.toml" <<EOF
+id = $id
+language = "$language"
+source = "$source"
+title = ""
+difficulty = 0
+
+# Omit these to use oj.defaults.toml.
+# time_limit_ms = $(default_value time_limit_ms "$fallback_time_limit_ms")
+# memory_limit_mb = $(default_value memory_limit_mb "$fallback_memory_limit_mb")
+EOF
+
+    cat > "$dir/README.md" <<EOF
+<!--markdownlint-disable MD033-->
+
+#
+
+编号：$id<br/>
+
+## 问题描述
+
+## 输入说明
+
+## 输出说明
+
+## 输入样例
+
+## 输出样例
+
+> [💭 解题思路](./NOTES.md)
+EOF
+
+    cat > "$dir/NOTES.md" <<EOF
+# 思路记录
+
+>
+EOF
+
+    for i in 1 2 3; do
+        : > "$dir/samples/$i.in"
+        : > "$dir/samples/$i.out"
+    done
+
+    echo "[oj-add] created problems/$id"
+}
+
+list_problems() {
+    find "$repo_root/problems" -mindepth 2 -maxdepth 2 -name problem.toml -print |
+        sed "s#^$repo_root/problems/##; s#/problem.toml\$##" |
+        sort -n
+}
+
+sync_list() {
+    local readme="$repo_root/README.md"
+    local begin_marker="<!--problemlist-begins-->"
+    local end_marker="<!--problemlist-ends-->"
+
+    [[ -f "$readme" ]] || die "README.md not found"
+
+    if ! grep -qF "$begin_marker" "$readme" || ! grep -qF "$end_marker" "$readme"; then
+        die "markers $begin_marker / $end_marker not found in README.md"
+    fi
+
+    # Build table in a temp file (avoids awk -v newline issues)
+    local tmp_table
+    tmp_table="$(mktemp)"
+
+    {
+        echo "| ID | 标题 | 难度 | 语言 |"
+        echo "|:--:|:---|:---|:--:|"
+
+        while IFS= read -r toml; do
+            local id title difficulty language
+            id="$(toml_get "$toml" id || true)"
+            title="$(toml_get "$toml" title || true)"
+            difficulty="$(toml_get "$toml" difficulty || true)"
+            language="$(toml_get "$toml" language || true)"
+
+            [[ -n "$id" ]] || continue
+
+            local stars="-"
+            case "${difficulty:-0}" in
+                1) stars="★☆☆☆☆" ;;
+                2) stars="★★☆☆☆" ;;
+                3) stars="★★★☆☆" ;;
+                4) stars="★★★★☆" ;;
+                5) stars="★★★★★" ;;
+            esac
+
+            local lang_label="$language"
+            [[ "$language" == "cpp" ]] && lang_label="C++"
+            [[ "$language" == "c"   ]] && lang_label="C"
+
+            printf '| %s | %s | %s | %s |\n' \
+                "$id" "${title:--}" "$stars" "$lang_label"
+        done < <(find "$repo_root/problems" -maxdepth 2 -name problem.toml | sort -V)
+    } > "$tmp_table"
+
+    # Splice: everything before begin_marker + table + everything after end_marker
+    local tmp_out
+    tmp_out="$(mktemp)"
+
+    awk -v begin="$begin_marker" -v end="$end_marker" '
+        NR == FNR { table[NR] = $0; next }
+        $0 == begin { print; for (i = 1; i in table; i++) print table[i]; print ""; in_block = 1; next }
+        in_block && $0 == end { in_block = 0 }
+        !in_block
+    ' "$tmp_table" "$readme" > "$tmp_out"
+
+    mv "$tmp_out" "$readme"
+    rm -f "$tmp_table"
+
+    # Update problem count
+    local count
+    count=$(find "$repo_root/problems" -maxdepth 2 -name problem.toml | wc -l)
+    sed -i "s/<!--problem-count-->[0-9]*<!--problem-count-->/<!--problem-count-->$count<!--problem-count-->/" "$readme"
+
+    echo "[oj-sync] updated problem list ($count problems) in README.md"
+}
+
+clean_problem() {
+    local id="${1:-}"
+
+    if [[ -n "$id" ]]; then
+        problem_dir "$id" >/dev/null
+        rm -rf "$build_root/$id"
+        find "$repo_root/problems/$id" -type f \( -name '*.actual' -o -name main -o -name main_ai \) -delete
+        echo "[oj-clean] cleaned problems/$id"
+    else
+        rm -rf "$build_root"
+        find "$repo_root/problems" -type f \( -name '*.actual' -o -name main -o -name main_ai \) -delete
+        echo "[oj-clean] cleaned all generated outputs"
+    fi
+}
+
+main() {
+    local cmd="${1:-}"
+    shift || true
+
+    case "$cmd" in
+        list) list_problems "$@" ;;
+        add) add_problem "$@" ;;
+        build) [[ $# -ge 1 ]] || die "usage: tools/oj build <problem-id> [debug|release|memcheck]"; build_problem "$@" ;;
+        run)
+            [[ $# -ge 1 ]] || die "usage: tools/oj run <problem-id> [debug|release]"
+            build_problem "$1" "${2:-debug}"
+            ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" \
+                UBSAN_OPTIONS="${UBSAN_OPTIONS:-print_stacktrace=1}" \
+                exec "$(binary_path "$1" "${2:-debug}")"
+            ;;
+        test) [[ $# -ge 1 ]] || die "usage: tools/oj test <problem-id> [debug|release]"; test_problem "$@" ;;
+        check) [[ $# -eq 1 ]] || die "usage: tools/oj check <problem-id>"; test_problem "$1" debug; tidy_target "$1" ;;
+        fmt) fmt_target "${1:-}" ;;
+        tidy) [[ $# -eq 1 ]] || die "usage: tools/oj tidy <problem-id|path>"; tidy_target "$1" ;;
+        bench) [[ $# -eq 1 ]] || die "usage: tools/oj bench <problem-id>"; bench_problem "$1" ;;
+        memcheck) [[ $# -eq 1 ]] || die "usage: tools/oj memcheck <problem-id>"; memcheck_problem "$1" ;;
+        sync-list) sync_list "$@" ;;
+        clean) clean_problem "${1:-}" ;;
+        -h | --help | help | "") usage ;;
+        *) usage; die "unknown command: $cmd" ;;
+    esac
+}
+
+main "$@"
