@@ -8,7 +8,7 @@ build_root="$repo_root/.build"
 fallback_time_limit_ms=1000
 fallback_memory_limit_mb=128
 fallback_language="cpp"
-fallback_compare="trim-trailing"
+fallback_compare="exact"
 
 usage() {
     cat <<'EOF'
@@ -602,8 +602,8 @@ sync_list() {
             [[ "$language" == "cpp" ]] && lang_label="C++"
             [[ "$language" == "c"   ]] && lang_label="C"
 
-            printf '| %s | %s | %s | %s |\n' \
-                "$id" "${title:--}" "$stars" "$lang_label"
+            printf '| [%s](problems/%s/) | [%s](problems/%s/README.md) | %s | %s |\n' \
+                "$id" "$id" "${title:--}" "$id" "$stars" "$lang_label"
         done < <(find "$repo_root/problems" -maxdepth 2 -name problem.toml | sort -V)
     } > "$tmp_table"
 

@@ -22,6 +22,25 @@
 
 <!--markdownlint-disable-->
 <!--problemlist-begins-->
+| ID | 标题 | 难度 | 语言 |
+|:--:|:---|:---|:--:|
+| [4](problems/4/) | [命令行选项](problems/4/README.md) | ★★★★☆ | C++ |
+| [72](problems/72/) | [寻找最长的行](problems/72/README.md) | ★★☆☆☆ | C++ |
+| [73](problems/73/) | [字符串压缩](problems/73/README.md) | ★★★☆☆ | C++ |
+| [74](problems/74/) | [括号匹配](problems/74/README.md) | ★★★★☆ | C++ |
+| [108](problems/108/) | [拼数字](problems/108/README.md) | ★★★☆☆ | C++ |
+| [134](problems/134/) | [数字分解排序](problems/134/README.md) | ★★★☆☆ | C++ |
+| [173](problems/173/) | [-](problems/173/README.md) | - | C++ |
+| [175](problems/175/) | [-](problems/175/README.md) | - | C++ |
+| [242](problems/242/) | [成绩统计](problems/242/README.md) | ★☆☆☆☆ | C++ |
+| [243](problems/243/) | [考试排名](problems/243/README.md) | ★☆☆☆☆ | C++ |
+| [246](problems/246/) | [单词统计](problems/246/README.md) | ★☆☆☆☆ | C |
+| [251](problems/251/) | [年月日统计](problems/251/README.md) | ★☆☆☆☆ | C++ |
+| [465](problems/465/) | [排球比赛](problems/465/README.md) | ★★★☆☆ | C++ |
+| [469](problems/469/) | [输入联想](problems/469/README.md) | ★☆☆☆☆ | C |
+| [487](problems/487/) | [分段统计学生成绩](problems/487/README.md) | ★★☆☆☆ | C++ |
+| [493](problems/493/) | [找出总分最高的学生](problems/493/README.md) | ★★★☆☆ | C++ |
+| [560](problems/560/) | [子串定位](problems/560/README.md) | ★★☆☆☆ | C++ |
 
 <!--problemlist-ends-->
 <!--markdownlint-enable-->
@@ -103,7 +122,7 @@ memory_limit_mb = 64
 compare = "exact"
 ```
 
-没有写时使用 `oj.defaults.toml`。当前默认值是 `1000 ms`、`128 MiB`，输出比较模式为 `trim-trailing`，即忽略行尾空白和 CRLF。需要逐字节比较时，把题目的 `compare` 改成 `exact`。
+没有写时使用 `oj.defaults.toml`。当前默认值是 `1000 ms`、`128 MiB`，输出比较模式为 `exact`（逐字节严格比较）。如果题目允许忽略行尾空白差异，把题目的 `compare` 改成 `trim-trailing`。
 
 ## 免责声明
 

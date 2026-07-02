@@ -1,3 +1,5 @@
+/* <title> for problem <id> on XDOJ by LyCecilion - Pure C version */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +11,6 @@
 #define debug(...) ((void)0)
 #endif
 
-int main() {
+int main(void) {
     return 0;
 }
