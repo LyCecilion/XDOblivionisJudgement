@@ -1,0 +1,7 @@
+id = 493
+language = "cpp"
+source = "main.cpp"
+time_limit_ms = 1000
+memory_limit_mb = 10
+title = "找出总分最高的学生"
+difficulty = 3
