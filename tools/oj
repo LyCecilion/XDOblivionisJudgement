@@ -26,6 +26,7 @@ commands:
   bench <problem-id>
   memcheck <problem-id>
   sync-list
+  commit <problem-id>
   clean [problem-id]
 EOF
 }
@@ -643,6 +644,36 @@ clean_problem() {
     fi
 }
 
+commit_problem() {
+    local id="$1"
+    local title
+
+    # Ensure problem exists in working tree
+    local dir="$repo_root/problems/$id"
+    [[ -d "$dir" ]] || die "problem not found: $id"
+
+    title="$(toml_get "$dir/problem.toml" title || true)"
+    [[ -z "$title" ]] && title="$id"
+
+    # Update README table and count
+    sync_list
+
+    # Stage problem + README
+    git -C "$repo_root" add "problems/$id/" README.md
+
+    # Detect new vs modified
+    local commit_type="fix"
+    local commit_desc="update solution for $title"
+    if ! git -C "$repo_root" ls-tree HEAD "problems/$id" >/dev/null 2>&1; then
+        commit_type="feat"
+        commit_desc="add solution for $title"
+    fi
+
+    git -C "$repo_root" commit -m "${commit_type}(${id}): ${commit_desc}"
+
+    echo "[oj-commit] ${commit_type}(${id}): ${commit_desc}"
+}
+
 main() {
     local cmd="${1:-}"
     shift || true
@@ -665,6 +696,7 @@ main() {
         bench) [[ $# -eq 1 ]] || die "usage: tools/oj bench <problem-id>"; bench_problem "$1" ;;
         memcheck) [[ $# -eq 1 ]] || die "usage: tools/oj memcheck <problem-id>"; memcheck_problem "$1" ;;
         sync-list) sync_list "$@" ;;
+        commit) [[ $# -eq 1 ]] || die "usage: tools/oj commit <problem-id>"; commit_problem "$1" ;;
         clean) clean_problem "${1:-}" ;;
         -h | --help | help | "") usage ;;
         *) usage; die "unknown command: $cmd" ;;

@@ -39,5 +39,8 @@ memcheck id:
 sync-list:
     ./tools/oj sync-list
 
+commit id:
+    ./tools/oj commit {{ id }}
+
 clean id="":
     ./tools/oj clean {{ id }}
