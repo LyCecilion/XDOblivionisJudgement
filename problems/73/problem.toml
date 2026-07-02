@@ -1,0 +1,7 @@
+id = 73
+language = "cpp"
+source = "main.cpp"
+time_limit_ms = 1000
+memory_limit_mb = 1
+title = "字符串压缩"
+difficulty = 3
