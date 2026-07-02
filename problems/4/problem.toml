@@ -1,0 +1,6 @@
+id = 4
+language = "cpp"
+source = "main.cpp"
+time_limit_ms = 1000
+title = "命令行选项"
+difficulty = 4
