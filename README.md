@@ -33,7 +33,7 @@
 | [74](problems/74/) | [括号匹配](problems/74/README.md) | ★★★★☆ | C++ |
 | [108](problems/108/) | [拼数字](problems/108/README.md) | ★★★☆☆ | C++ |
 | [134](problems/134/) | [数字分解排序](problems/134/README.md) | ★★★☆☆ | C++ |
-| [173](problems/173/) | [-](problems/173/README.md) | - | C++ |
+| [173](problems/173/) | [购票系统](problems/173/README.md) | ★★★★★ | C++ |
 | [175](problems/175/) | [-](problems/175/README.md) | - | C++ |
 | [242](problems/242/) | [成绩统计](problems/242/README.md) | ★☆☆☆☆ | C++ |
 | [243](problems/243/) | [考试排名](problems/243/README.md) | ★☆☆☆☆ | C++ |

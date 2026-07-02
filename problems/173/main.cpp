@@ -1,5 +1,10 @@
+/* 购票系统 for problem 173 on XDOJ by LyCecilion - C++ version */
+
 #include <bits/stdc++.h>
 using namespace std;
+
+using i64 = long long;
+using u64 = unsigned long long;
 
 #ifdef LOCAL
 #define debug(x) cerr << "[debug] " << #x << " = " << (x) << '\n'
@@ -7,38 +12,46 @@ using namespace std;
 #define debug(x) ((void)0)
 #endif
 
-static int find(vector<bool>& occupied);
+namespace {
+constexpr int ROWS = 20;
+constexpr int SEATS_PER_ROW = 5;
+constexpr int MAX_SEAT = ROWS * SEATS_PER_ROW;
+} // namespace
 
-int main() {
+static void find(bitset<MAX_SEAT + 1>& occupied);
+
+int main(void) {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
 
     int n;
     cin >> n;
 
-    vector<bool> occupied(101, false);
+    bitset<MAX_SEAT + 1> occupied;
 
     for (int i = 0; i < n; i++) {
+        if (i) {
+            cout << '\n';
+        }
         find(occupied);
     }
 
     return 0;
 }
 
-static int find(vector<bool>& occupied) {
+static void find(bitset<MAX_SEAT + 1>& occupied) {
     int p;
     cin >> p;
 
-    /* note 1-index */
+    /* 注意 1-index */
 
-    // for p <= 5, find continuous p numbers in a row
-    // check from (1, 5), till we find a row to settle p people
-    for (int i = 0; i < 20; i++) {
-        const int row_begin = 5 * i + 1; // 1-index
-        const int row_end = 5 * (i + 1); // 1-index
+    // 对于 p <= SEATS_PER_ROW，在一排中找到连续的 p 个空位
+    for (int i = 0; i < ROWS; i++) {
+        const int row_begin = SEATS_PER_ROW * i + 1; // 1-index
+        const int row_end = SEATS_PER_ROW * (i + 1); // 1-index
 
-        // suppose we have p seats at end of one row, then seats are (row_end - (p-1), row_end,
-        // therefore we let seats_begin from row_begin to row_end - (p-1).
+        // 例如我们的 p 个座位恰位于排尾，则座位分布于 row_end - (p-1) 到 row_end，从而遍历
+        // seats_begin 从 row_begin 到 row_end - (p-1)
         for (int seats_begin = row_begin; seats_begin <= row_end - (p - 1); seats_begin++) {
             bool available = true;
             for (int j = 0; j < p; j++) {
@@ -48,26 +61,31 @@ static int find(vector<bool>& occupied) {
                 }
             }
             if (available) {
+                bool first = true;
                 for (int j = 0; j < p; j++) {
                     occupied[seats_begin + j] = true;
-                    cout << seats_begin + j << ' ';
+                    if (!first) {
+                        cout << ' ';
+                    }
+                    first = false;
+                    cout << seats_begin + j;
                 }
-                cout << '\n';
-                return 0;
+                return;
             }
         }
     }
 
-    // for conditions that do not having continuous p seats, we have
+    // fallback 分支
     int found = 0;
-    for (int i = 0; found < p; i++) {
+    for (int i = 0; found < p && i < MAX_SEAT; i++) {
         if (!occupied[i + 1]) {
-            cout << i + 1 << ' ';
+            if (found) {
+                cout << ' ';
+            }
+            cout << i + 1;
             occupied[i + 1] = true;
 
             found++;
         }
     }
-    cout << '\n';
-    return 0;
 }
