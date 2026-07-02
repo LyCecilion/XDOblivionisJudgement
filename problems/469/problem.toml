@@ -1,0 +1,6 @@
+id = 469
+language = "c"
+source = "main.c"
+time_limit_ms = 1000
+title = "输入联想"
+difficulty = 1
