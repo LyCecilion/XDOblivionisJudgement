@@ -1,0 +1,7 @@
+id = 487
+language = "cpp"
+source = "main.cpp"
+time_limit_ms = 1000
+memory_limit_mb = 10
+title = "分段统计学生成绩"
+difficulty = 2
