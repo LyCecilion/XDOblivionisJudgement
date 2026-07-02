@@ -125,6 +125,7 @@ difficulty = 3
 ```toml
 time_limit_ms = 1000
 memory_limit_mb = 64
+memory_limit_kb = 256   # 小于 1MB 时直接用 KB，比如 256KB
 compare = "exact"
 ```
 

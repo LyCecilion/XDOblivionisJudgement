@@ -1,5 +1,7 @@
 id = 173
 language = "cpp"
 source = "main.cpp"
-title = ""
-difficulty = 0
+time_limit_ms = 1000
+memory_limit_kb = 256
+title = "购票系统"
+difficulty = 5

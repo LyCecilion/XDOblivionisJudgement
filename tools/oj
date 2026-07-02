@@ -335,25 +335,35 @@ bench_case() {
     local expected="$4"
     local label="$5"
     local time_limit_ms="$6"
-    local memory_limit_mb="$7"
+    local memory_limit_kb="$7"
+    local memory_limit_mb="$8"
     local timeout_seconds
-    local memory_limit_kb
     local actual
     local report
     local rss
 
     timeout_seconds=$(((time_limit_ms + 999) / 1000 + 1))
-    memory_limit_kb=$((memory_limit_mb * 1024))
     actual="$build_root/$id/bench/$label.actual"
     report="$build_root/$id/bench/$label.time"
 
     mkdir -p "$(dirname "$actual")"
 
-    echo "[oj-bench] $label timeout=${timeout_seconds}s memory=${memory_limit_mb}MiB"
+    # ulimit -v must be high enough to load the binary + runtime (~32MB minimum)
+    local min_kb=32768
+    local ulimit_kb=$memory_limit_kb
+    if (( ulimit_kb < min_kb )); then
+        ulimit_kb=$min_kb
+    fi
+
+    if [[ -n "$memory_limit_mb" ]]; then
+        echo "[oj-bench] $label timeout=${timeout_seconds}s limit=${memory_limit_mb}MiB"
+    else
+        echo "[oj-bench] $label timeout=${timeout_seconds}s limit=${memory_limit_kb}KiB"
+    fi
     /usr/bin/time -v -o "$report" \
         timeout "$timeout_seconds" \
         bash -c 'ulimit -v "$1"; exec "$2" < "$3" > "$4"' \
-        bash "$memory_limit_kb" "$bin" "$input" "$actual"
+        bash "$ulimit_kb" "$bin" "$input" "$actual"
 
     if [[ -f "$expected" ]]; then
         compare_output "$id" "$expected" "$actual"
@@ -378,7 +388,18 @@ bench_problem() {
     [[ -x /usr/bin/time ]] || die "missing /usr/bin/time"
 
     time_limit_ms="$(problem_value "$id" time_limit_ms "$fallback_time_limit_ms")"
-    memory_limit_mb="$(problem_value "$id" memory_limit_mb "$fallback_memory_limit_mb")"
+
+    # Prefer memory_limit_kb for sub-MB limits; fall back to memory_limit_mb
+    local memory_limit_kb memory_limit_mb
+    memory_limit_kb="$(toml_get "$(problem_file "$id")" memory_limit_kb || true)"
+
+    if [[ -z "$memory_limit_kb" ]]; then
+        # Read memory_limit_mb (may be fractional, e.g. 0.25 for 256KB)
+        memory_limit_mb="$(problem_value "$id" memory_limit_mb "$fallback_memory_limit_mb")"
+        memory_limit_kb="$(awk "BEGIN { printf \"%d\", $memory_limit_mb * 1024 }")"
+    else
+        memory_limit_mb=""  # signal bench_case to use KiB label
+    fi
 
     build_problem "$id" release
     bin="$(binary_path "$id" release)"
@@ -388,7 +409,7 @@ bench_problem() {
         expected="${input%.in}.out"
         label="sample-$(basename "${input%.in}")"
         [[ -f "$expected" ]] || die "missing expected output: ${expected#$repo_root/}"
-        bench_case "$id" "$bin" "$input" "$expected" "$label" "$time_limit_ms" "$memory_limit_mb"
+        bench_case "$id" "$bin" "$input" "$expected" "$label" "$time_limit_ms" "$memory_limit_kb" "$memory_limit_mb"
     done < <(sample_inputs "$id")
 
     if [[ -d "$(problem_dir "$id")/stress" ]]; then
@@ -396,7 +417,7 @@ bench_problem() {
             count=$((count + 1))
             expected="${input%.in}.out"
             label="stress-$(basename "${input%.in}")"
-            bench_case "$id" "$bin" "$input" "$expected" "$label" "$time_limit_ms" "$memory_limit_mb"
+            bench_case "$id" "$bin" "$input" "$expected" "$label" "$time_limit_ms" "$memory_limit_kb" "$memory_limit_mb"
         done < <(find "$(problem_dir "$id")/stress" -maxdepth 1 -type f -name '*.in' | sort)
     fi
 
@@ -519,6 +540,7 @@ difficulty = 0
 # Omit these to use oj.defaults.toml.
 # time_limit_ms = $(default_value time_limit_ms "$fallback_time_limit_ms")
 # memory_limit_mb = $(default_value memory_limit_mb "$fallback_memory_limit_mb")
+# memory_limit_kb = 256    # prefer KB for sub-MB limits (e.g. 256KB)
 EOF
 
     cat > "$dir/README.md" <<EOF
