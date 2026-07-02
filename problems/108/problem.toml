@@ -1,0 +1,6 @@
+id = 108
+language = "cpp"
+source = "main.cpp"
+time_limit_ms = 1000
+title = "拼数字"
+difficulty = 3
