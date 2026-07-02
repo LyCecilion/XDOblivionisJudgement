@@ -1,0 +1,7 @@
+id = 134
+language = "cpp"
+source = "main.cpp"
+time_limit_ms = 1000
+memory_limit_mb = 1
+title = "数字分解排序"
+difficulty = 3
