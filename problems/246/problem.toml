@@ -1,0 +1,6 @@
+id = 246
+language = "c"
+source = "main.c"
+time_limit_ms = 1000
+title = "单词统计"
+difficulty = 1
