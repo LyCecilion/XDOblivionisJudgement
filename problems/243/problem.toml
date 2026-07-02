@@ -1,0 +1,7 @@
+id = 243
+language = "cpp"
+source = "main.cpp"
+time_limit_ms = 1000
+memory_limit_mb = 1
+title = "考试排名"
+difficulty = 1
