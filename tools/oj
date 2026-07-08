@@ -599,11 +599,11 @@ sync_list() {
     tmp_table="$(mktemp)"
 
     {
-        echo "| ID | 标题 | 难度 | 语言 |"
-        echo "|:--:|:---|:---|:--:|"
+        echo "| ID | 标题 | 题解 | 难度 | 语言 |"
+        echo "|:--:|:---|:---:|:---|:--:|"
 
         while IFS= read -r toml; do
-            local id title difficulty language
+            local id title difficulty language source_path source_label
             id="$(toml_get "$toml" id || true)"
             title="$(toml_get "$toml" title || true)"
             difficulty="$(toml_get "$toml" difficulty || true)"
@@ -624,8 +624,12 @@ sync_list() {
             [[ "$language" == "cpp" ]] && lang_label="C++"
             [[ "$language" == "c"   ]] && lang_label="C"
 
-            printf '| [%s](problems/%s/) | [%s](problems/%s/README.md) | %s | %s |\n' \
-                "$id" "$id" "${title:--}" "$id" "$stars" "$lang_label"
+            source_path="$(problem_source "$id")"
+            source_path="${source_path#$repo_root/}"
+            source_label="$(basename "$source_path")"
+
+            printf '| [%s](problems/%s/) | [%s](problems/%s/README.md) | [%s](%s) | %s | %s |\n' \
+                "$id" "$id" "${title:--}" "$id" "$source_label" "$source_path" "$stars" "$lang_label"
         done < <(find "$repo_root/problems" -maxdepth 2 -name problem.toml | sort -V)
     } > "$tmp_table"
 

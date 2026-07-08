@@ -1,0 +1,74 @@
+name: 原有题目勘误
+description: 报告现有题目描述、样例、题解或元数据的问题
+title: "[勘误] "
+labels:
+  - correction
+body:
+  - type: input
+    id: problem-id
+    attributes:
+      label: 题目 ID
+      description: 出问题的 problems/<id> 目录。
+      placeholder: "473"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 问题类型
+      options:
+        - 题解逻辑可能错误
+        - 题面描述错误或缺失
+        - 样例输入输出错误
+        - problem.toml 元数据错误
+        - 代码风格或仓库规范问题
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: 当前表现
+      description: 说明现在看到的问题。若是 WA/RE/TLE/MLE/UB，请写出触发输入或现象。
+      placeholder: |
+        当前 problems/<id>/... 中：
+        ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望修正
+      description: 说明你认为应该改成什么，尤其注意输出文本、标点和换行。
+      placeholder: |
+        期望：
+        ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 证据
+      description: 可粘贴 XDOJ 反馈、本地命令输出、反例、题面截图文字或样例差异。
+      placeholder: |
+        命令：
+        just test <id>
+
+        输出 / 差异：
+        ...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前检查
+      options:
+        - label: 我确认这个问题只涉及一个或少数几个明确题目，不是要求批量重写所有题解。
+          required: true
+        - label: 我已经尽量保留了输入输出中的空格、换行、大小写和全角/半角标点。
+          required: true

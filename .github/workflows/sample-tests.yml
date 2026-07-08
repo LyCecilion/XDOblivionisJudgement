@@ -1,0 +1,40 @@
+name: Sample Tests
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  samples:
+    name: Run visible sample tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc g++ just
+
+      - name: Run sample tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t problem_ids < <(./tools/oj list)
+
+          for id in "${problem_ids[@]}"; do
+            echo "::group::Problem ${id}"
+            if ! just test "${id}"; then
+              echo "::endgroup::"
+              exit 1
+            fi
+            echo "::endgroup::"
+          done

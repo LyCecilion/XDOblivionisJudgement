@@ -1,0 +1,82 @@
+name: 新题目请求
+description: 请求新增一道 XDOJ 题目和题解
+title: "[新题目] "
+labels:
+  - new-problem
+body:
+  - type: input
+    id: problem-id
+    attributes:
+      label: 题目 ID
+      description: XDOJ 上的题目编号。
+      placeholder: "473"
+    validations:
+      required: true
+
+  - type: input
+    id: problem-title
+    attributes:
+      label: 题目标题
+      description: 请填写题面中的中文标题；如果暂时未知，可以写“不确定”。
+      placeholder: 示例题目
+    validations:
+      required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: 期望语言
+      description: 新题默认按仓库工具创建，C++ 使用 just add，C 使用 just add-c。
+      options:
+        - C++
+        - C
+        - 不确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: statement
+    attributes:
+      label: 题面 / 链接
+      description: 粘贴题面、截图文字或 XDOJ 链接。请尽量包含输入说明、输出说明和数据范围。
+      placeholder: |
+        问题描述：
+        输入说明：
+        输出说明：
+        数据范围：
+    validations:
+      required: true
+
+  - type: textarea
+    id: samples
+    attributes:
+      label: 样例
+      description: 请按输入/输出成对提供，保留空格、换行和标点。
+      placeholder: |
+        样例 1 输入：
+        ...
+
+        样例 1 输出：
+        ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: limits
+    attributes:
+      label: 资源限制和比较要求
+      description: 如题面给出时间、内存、严格输出、忽略行尾空白等要求，请写在这里。
+      placeholder: |
+        时间限制：1000 ms
+        内存限制：128 MB
+        输出比较：exact / trim-trailing / 不确定
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 额外说明
+      description: 已知坑点、算法方向、隐藏测试风险或和现有题目相关的上下文。
+    validations:
+      required: false
