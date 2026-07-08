@@ -22,7 +22,7 @@
 
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/LyCecilion/XDOblivionisJudgement)
 ![GitHub last commit](https://img.shields.io/github/last-commit/LyCecilion/XDOblivionisJudgement)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/LyCecilion/XDOblivionisJudgement/sample-tests)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/LyCecilion/XDOblivionisJudgement/sample-tests.yml?branch=main)
 ![GitHub Issues](https://img.shields.io/github/issues/LyCecilion/XDOblivionisJudgement)
 ![GitHub Pull Requests](https://img.shields.io/github/issues-pr/LyCecilion/XDOblivionisJudgement)
 ![GitHub License](https://img.shields.io/github/license/LyCecilion/XDOblivionisJudgement)
